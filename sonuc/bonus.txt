@@ -1,0 +1,42 @@
+-- =====================================================
+-- Föy 05 / Meydan Okuma (Bonus) — Serileştirme Hatası Üretme
+-- Öğrenci No: 250541053
+-- Üye ID: 11, Başlangıç Kredisi: 722
+-- =====================================================
+
+-- İki oturum da SERIALIZABLE seviyesinde başlatılır ve üye 11'in kredisini okur:
+
+-- A: Transaction başlatır ve okur:
+vtysdb=> BEGIN ISOLATION LEVEL SERIALIZABLE;
+BEGIN
+vtysdb=*> SELECT kredi FROM krediler WHERE uye_id = 11;
+ kredi 
+-------
+   722
+(1 row)
+
+-- B: Transaction başlatır ve okur:
+vtysdb=> BEGIN ISOLATION LEVEL SERIALIZABLE;
+BEGIN
+vtysdb=*> SELECT kredi FROM krediler WHERE uye_id = 11;
+ kredi 
+-------
+   722
+(1 row)
+
+-- A: Okuduğu değere göre güncelleme yapar ve commit eder:
+vtysdb=*> UPDATE krediler SET kredi = 732 WHERE uye_id = 11;
+UPDATE 1
+vtysdb=*> COMMIT;
+COMMIT
+
+-- B: Kendi okuduğu eski değere göre güncellemeyi çalıştırmayı dener:
+vtysdb=*> UPDATE krediler SET kredi = 732 WHERE uye_id = 11;
+ERROR:  could not serialize access due to concurrent update
+vtysdb=!> COMMIT;
+ROLLBACK
+
+-- B: Hata sonrası transaction iptal olmuştur ve ROLLBACK ile sonlandırılır.
+
+-- Soru: Uygulama kodu bu hatayı aldığında ne yapmalıdır?
+-- Cevap: Uygulama kodu "could not serialize access" (SQLSTATE 40001 / serialization_failure) hatasını yakaladığında transaction'ı derhal ROLLBACK yapmalı ve işlemi sıfırdan yeniden denemelidir (retry mechanism / exponential backoff).

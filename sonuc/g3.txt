@@ -1,0 +1,104 @@
+-- =====================================================
+-- Föy 05 / Görev 3 — Kayıp Güncelleme (Lost Update) ve Çözümü
+-- Öğrenci No: 250541053
+-- Üye ID: 5, Başlangıç Kredisi: 528, Artış: 10 + 10
+-- =====================================================
+
+-- -----------------------------------------------------
+-- 1. TUR: Yanlış Kalıp — Kayıp Güncelleme (Lost Update)
+-- -----------------------------------------------------
+
+-- İki resepsiyon görevlisi (A ve B) aynı anda üye 5'in kredisini okur:
+-- A: Transaction başlatır ve kredisini okur:
+vtysdb=> BEGIN;
+BEGIN
+vtysdb=*> SELECT kredi FROM krediler WHERE uye_id = 5;
+ kredi 
+-------
+   528
+(1 row)
+
+-- B: Transaction başlatır ve kredisini okur (aynı değeri okur):
+vtysdb=> BEGIN;
+BEGIN
+vtysdb=*> SELECT kredi FROM krediler WHERE uye_id = 5;
+ kredi 
+-------
+   528
+(1 row)
+
+-- A: Okuduğu 528 değerinin üzerine 10 ekleyip 538 olarak yazar ve commit eder:
+vtysdb=*> UPDATE krediler SET kredi = 538 WHERE uye_id = 5;
+UPDATE 1
+vtysdb=*> COMMIT;
+COMMIT
+
+-- B: Kendi okuduğu 528 değerinin üzerine 10 ekleyip 538 yazar (A'nın yazdığını ezerek):
+vtysdb=*> UPDATE krediler SET kredi = 538 WHERE uye_id = 5;
+UPDATE 1
+vtysdb=*> COMMIT;
+COMMIT
+
+-- Sonuç Kontrolü:
+vtysdb=> SELECT kredi FROM krediler WHERE uye_id = 5;
+ kredi 
+-------
+   538
+(1 row)
+
+-- GÖZLEM:
+-- İki ayrı 10 kredi yüklemesi yapılmasına rağmen bakiye 548 yerine 538 oldu!
+-- A oturumunun yaptığı güncelleme sessizce kayboldu (Lost Update).
+
+
+-- -----------------------------------------------------
+-- 2. TUR: Doğru Kalıp — SELECT ... FOR UPDATE veya Atomik UPDATE ile Çözüm
+-- -----------------------------------------------------
+
+-- Bu turda yarış durumunu önlemek için SELECT ... FOR UPDATE ile satır kilitleme
+-- ve atomik UPDATE (SET kredi = kredi + 10) tekniği kullanılır.
+
+-- Kaldığı yerden (538) devam eden düzeltme:
+-- A: Transaction başlatır ve satırı kilitleyerek okur:
+vtysdb=> BEGIN;
+BEGIN
+vtysdb=*> SELECT kredi FROM krediler WHERE uye_id = 5 FOR UPDATE;
+ kredi 
+-------
+   538
+(1 row)
+
+-- B: Transaction başlatır ve satırı kilitleyerek okumak ister:
+vtysdb=> BEGIN;
+BEGIN
+vtysdb=*> SELECT kredi FROM krediler WHERE uye_id = 5 FOR UPDATE;
+-- (A commit edene kadar B bekler / bloklanır!)
+
+-- A: Krediyi artırıp commit eder:
+vtysdb=*> UPDATE krediler SET kredi = kredi + 10 WHERE uye_id = 5;
+UPDATE 1
+vtysdb=*> COMMIT;
+COMMIT
+
+-- (A commit ettiği anda B'nin kilidi açılır ve B güncel değeri görür):
+ kredi 
+-------
+   548
+(1 row)
+
+-- B: Güvenle kendi artışını yapar ve commit eder:
+vtysdb=*> UPDATE krediler SET kredi = kredi + 10 WHERE uye_id = 5;
+UPDATE 1
+vtysdb=*> COMMIT;
+COMMIT
+
+-- Düzeltme Sonrası Sonuç:
+vtysdb=> SELECT kredi FROM krediler WHERE uye_id = 5;
+ kredi 
+-------
+   558
+(1 row)
+
+-- (Eğer sıfırdan 528 başlangıç değerinden başlansaydı doğru değer 548 olacaktı.)
+-- Sonuç olarak SELECT ... FOR UPDATE ile satır kilitleme veya SET kredi = kredi + 10
+-- atomik güncellemesi sayesinde her iki yükleme de başarıyla yansıtılmış ve kayıp güncelleme önlenmiştir.

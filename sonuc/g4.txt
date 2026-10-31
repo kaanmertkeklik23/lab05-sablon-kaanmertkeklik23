@@ -1,0 +1,60 @@
+-- =====================================================
+-- Föy 05 / Görev 4 — Durability ve Mimari Gözlem
+-- Öğrenci No: 250541053
+-- Üye ID: 9, Başlangıç Kredisi: 270, Artış: 40
+-- =====================================================
+
+-- 1. Üye 9'un başlangıç bakiyesini sorgulayıp 40 kredi ekliyoruz ve COMMIT ediyoruz:
+vtysdb=> SELECT kredi FROM krediler WHERE uye_id = 9;
+ kredi 
+-------
+   270
+(1 row)
+
+vtysdb=> BEGIN;
+BEGIN
+vtysdb=*> UPDATE krediler SET kredi = kredi + 40 WHERE uye_id = 9;
+UPDATE 1
+vtysdb=*> COMMIT;
+COMMIT
+
+vtysdb=> SELECT kredi FROM krediler WHERE uye_id = 9;
+ kredi 
+-------
+   310
+(1 row)
+
+-- 2. Sunucu yeniden başlatıldı:
+-- $ docker compose restart postgres
+-- Container vtys-postgres Restarting
+-- Container vtys-postgres Started
+
+-- 3. Yeniden bağlandıktan sonra bakiyeyi tekrar kontrol ediyoruz:
+vtysdb=> SELECT kredi FROM krediler WHERE uye_id = 9;
+ kredi 
+-------
+   310
+(1 row)
+
+-- Gözlem:
+-- Sunucu yeniden başlatılmasına rağmen COMMIT edilen 310 bakiyesi kaybolmamıştır.
+-- Bu durum ACID'in Durability (Dayanıklılık) özelliğidir ve PostgreSQL'de
+-- Write-Ahead Logging (WAL) mekanizması sayesinde sağlanır.
+
+-- 4. Mimariye bir bakış:
+vtysdb=> SHOW shared_buffers;
+ shared_buffers 
+----------------
+ 128MB
+(1 row)
+
+vtysdb=> SELECT pid, state, query FROM pg_stat_activity;
+ pid | state  |                      query                      
+-----+--------+-------------------------------------------------
+  66 |        | 
+  67 |        | 
+ 131 | active | SELECT pid, state, query FROM pg_stat_activity;
+  63 |        | 
+  62 |        | 
+  65 |        | 
+(6 rows)

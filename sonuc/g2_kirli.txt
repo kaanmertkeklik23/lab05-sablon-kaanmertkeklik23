@@ -1,0 +1,39 @@
+-- =====================================================
+-- Föy 05 / Görev 2 — Deney 2a: Kirli Okuma Denemesi
+-- Öğrenci No: 250541053
+-- Üye ID: 3, Artış: 77, Başlangıç Kredisi: 790
+-- =====================================================
+
+-- A: Transaction başlatılıyor ve üye 3'ün kredisi artırılıyor
+vtysdb=> BEGIN;
+BEGIN
+vtysdb=*> UPDATE krediler SET kredi = kredi + 77 WHERE uye_id = 3;
+UPDATE 1
+
+-- A: Oturum A kendi yaptığı commit edilmemiş değişikliği sorguluyor (yeni değeri görür):
+vtysdb=*> SELECT kredi FROM krediler WHERE uye_id = 3;
+ kredi 
+-------
+   867
+(1 row)
+
+-- B: Oturum B aynı anda üye 3'ün kredisini sorguluyor (A henüz commit etmedi):
+vtysdb=> SELECT kredi FROM krediler WHERE uye_id = 3;
+ kredi 
+-------
+   790
+(1 row)
+
+-- A: Oturum A işlemi iptal ediyor (ROLLBACK):
+vtysdb=*> ROLLBACK;
+ROLLBACK
+
+-- B: Oturum B tekrar sorguluyor:
+vtysdb=> SELECT kredi FROM krediler WHERE uye_id = 3;
+ kredi 
+-------
+   790
+(1 row)
+
+-- Sonuç:
+-- Oturum B commit edilmemiş değeri görmemiştir; PostgreSQL kirli okumaya (dirty read) izin vermez.

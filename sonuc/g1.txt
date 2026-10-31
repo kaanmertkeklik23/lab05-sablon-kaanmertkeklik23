@@ -1,0 +1,31 @@
+-- =====================================================
+-- Föy 05 / Görev 1 — Atomicity: Kredi Transferi Transkripti
+-- Öğrenci No: 250541053
+-- =====================================================
+
+-- A: Başlangıç bakiyelerini kontrol ediyoruz:
+vtysdb=> SELECT uye_id, kredi FROM krediler WHERE uye_id IN (1, 2) ORDER BY uye_id;
+ uye_id | kredi 
+--------+-------
+      1 |   704
+      2 |   462
+(2 rows)
+
+-- A: 1 numaralı üyeden 2 numaralı üyeye bakiyesinden fazla (99999) kredi aktarma denemesi:
+vtysdb=> BEGIN;
+BEGIN
+vtysdb=*> UPDATE krediler SET kredi = kredi - 99999 WHERE uye_id = 1;
+ERROR:  new row for relation "krediler" violates check constraint "krediler_kredi_check"
+DETAIL:  Failing row contains (1, -99295).
+vtysdb=!> UPDATE krediler SET kredi = kredi + 99999 WHERE uye_id = 2;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+vtysdb=!> COMMIT;
+ROLLBACK
+
+-- A: Hata sonrası iki üyenin de bakiyelerinin değişmediği (Atomicity korundu):
+vtysdb=> SELECT uye_id, kredi FROM krediler WHERE uye_id IN (1, 2) ORDER BY uye_id;
+ uye_id | kredi 
+--------+-------
+      1 |   704
+      2 |   462
+(2 rows)

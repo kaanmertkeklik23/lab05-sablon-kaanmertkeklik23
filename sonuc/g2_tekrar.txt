@@ -1,0 +1,74 @@
+-- =====================================================
+-- Föy 05 / Görev 2 — Deney 2b: Tekrarlanamayan Okuma ve Çözümü
+-- Öğrenci No: 250541053
+-- Üye ID: 7, Başlangıç Değeri: 860, Artış: 30
+-- =====================================================
+
+-- -----------------------------------------------------
+-- 1. TUR: Varsayılan İzolasyon Seviyesi (READ COMMITTED)
+-- -----------------------------------------------------
+
+-- B: Transaction başlatıyor ve üye 7'nin kredisini okuyor (ilk okuma):
+vtysdb=> BEGIN;
+BEGIN
+vtysdb=*> SELECT kredi FROM krediler WHERE uye_id = 7;
+ kredi 
+-------
+   860
+(1 row)
+
+-- A: Üye 7'ye 30 kredi ekliyor (otomatik commit):
+vtysdb=> UPDATE krediler SET kredi = kredi + 30 WHERE uye_id = 7;
+UPDATE 1
+
+-- B: Aynı transaction içinde sorguyu tekrarlıyor (ikinci okuma - DEĞİŞTİ! Tekrarlanamayan Okuma):
+vtysdb=*> SELECT kredi FROM krediler WHERE uye_id = 7;
+ kredi 
+-------
+   890
+(1 row)
+
+-- B: Transaction sonlandırılıyor:
+vtysdb=*> COMMIT;
+COMMIT
+
+
+-- -----------------------------------------------------
+-- 2. TUR: REPEATABLE READ İzolasyon Seviyesi ile Çözüm
+-- -----------------------------------------------------
+
+-- B: REPEATABLE READ seviyesinde yeni bir transaction başlatıyor ve ilk okumayı yapıyor:
+vtysdb=> BEGIN ISOLATION LEVEL REPEATABLE READ;
+BEGIN
+vtysdb=*> SELECT kredi FROM krediler WHERE uye_id = 7;
+ kredi 
+-------
+   890
+(1 row)
+
+-- A: Oturum A bu kez 30 kredi daha ekliyor (otomatik commit):
+vtysdb=> UPDATE krediler SET kredi = kredi + 30 WHERE uye_id = 7;
+UPDATE 1
+
+-- B: Oturum B aynı transaction içinde sorguyu tekrarlıyor (ikinci okuma - DEĞİŞMEDİ):
+vtysdb=*> SELECT kredi FROM krediler WHERE uye_id = 7;
+ kredi 
+-------
+   890
+(1 row)
+
+-- B: Transaction commit ediliyor:
+vtysdb=*> COMMIT;
+COMMIT
+
+-- B: Transaction bittikten sonra güncel bakiye doğrulanıyor:
+vtysdb=> SELECT kredi FROM krediler WHERE uye_id = 7;
+ kredi 
+-------
+   920
+(1 row)
+
+-- Sonuç ve Değerlendirme:
+-- READ COMMITTED seviyesinde, transaction sürerken commit edilen harici değişiklikler görüldüğü için
+-- tekrarlanamayan okuma anomalisi gerçekleşir. REPEATABLE READ seviyesinde ise transaction ilk okuma
+-- anında bir snapshot aldığı için harici commit'lerden etkilenmez ve aynı sorgu her seferinde aynı sonucu üretir.
